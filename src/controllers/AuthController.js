@@ -95,6 +95,33 @@ class AuthController {
             res.status(500).json({ error: 'Failed to generate OTP' });
         }
     }
+    static async forgotPassword(req, res) {
+        try {
+            const { email } = req.body;
+            if (!email) return res.status(400).json({ error: 'Email is required' });
+
+            const result = await AuthService.requestPasswordReset(email);
+            res.json(result);
+        } catch (error) {
+            console.error('Forgot password error:', error);
+            res.status(500).json({ error: 'Request failed' });
+        }
+    }
+
+    static async resetPassword(req, res) {
+        try {
+            const { email, otp, newPassword } = req.body;
+            if (!email || !otp || !newPassword) {
+                return res.status(400).json({ error: 'All fields are required' });
+            }
+
+            const result = await AuthService.resetPassword(email, otp, newPassword);
+            res.json(result);
+        } catch (error) {
+            console.error('Reset password error:', error);
+            res.status(400).json({ error: error.message });
+        }
+    }
 }
 
 module.exports = AuthController;

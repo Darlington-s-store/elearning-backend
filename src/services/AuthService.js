@@ -168,6 +168,41 @@ class AuthService {
             { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
         );
     }
+    static async requestPasswordReset(email) {
+        const user = await UserModel.findByEmail(email);
+        if (!user) {
+            // Security: Don't reveal if user exists
+            return { message: 'If an account exists, an OTP has been sent.' };
+        }
+
+        const OtpService = require('./OtpService');
+        const code = await OtpService.generateOTP(user.id, 'password_reset');
+
+        // In production, send email here.
+        // For dev, we return it in the message or log it.
+        console.log(`[PASSWORD RESET] OTP for ${email}: ${code}`);
+
+        return { message: 'OTP sent to your email.', devCode: code };
+    }
+
+    static async resetPassword(email, otp, newPassword) {
+        const user = await UserModel.findByEmail(email);
+        if (!user) {
+            throw new Error('Invalid request');
+        }
+
+        const OtpService = require('./OtpService');
+        const isValid = await OtpService.verifyOTP(user.id, otp, 'password_reset');
+
+        if (!isValid) {
+            throw new Error('Invalid or expired OTP');
+        }
+
+        const passwordHash = await bcrypt.hash(newPassword, 10);
+        await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [passwordHash, user.id]);
+
+        return { message: 'Password reset successfully. You can now login.' };
+    }
 }
 
 module.exports = AuthService;

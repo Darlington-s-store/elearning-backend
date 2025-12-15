@@ -81,6 +81,25 @@ router.get('/', authMiddleware, requireRole(['admin', 'teacher']), async (req, r
   }
 });
 
+// Generate OTP (Authenticated users)
+router.post('/generate-otp', authMiddleware, async (req, res) => {
+  try {
+    const OtpService = require('../services/OtpService');
+    const { type = 'sensitive_action' } = req.body;
+
+    // Generate OTP
+    const code = await OtpService.generateOTP(req.user.id, type);
+
+    // In production, this would trigger an email/SMS. 
+    // For Dev, we return it or just console log (handled in service).
+    // We return a success message telling user to check their email/console.
+    res.json({ message: 'OTP generated. Check your email (or server console in dev).' });
+  } catch (error) {
+    console.error('Generate OTP error:', error);
+    res.status(500).json({ error: 'Failed to generate OTP' });
+  }
+});
+
 // Get user by ID
 router.get('/:id', authMiddleware, async (req, res) => {
   try {

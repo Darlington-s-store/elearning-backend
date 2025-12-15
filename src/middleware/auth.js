@@ -89,10 +89,10 @@ const requireRole = (...roles) => {
       [req.user.id]
     );
 
-    const userRoles = result.rows.map(r => r.role);
-    userRoles.push(req.user.role); // Include the main role from users table
+    const userRoles = result.rows.map(r => r.role.toLowerCase());
+    userRoles.push(req.user.role.toLowerCase()); // Include the main role from users table
 
-    const requiredRoles = roles.flat();
+    const requiredRoles = roles.flat().map(r => r.toLowerCase());
     const hasRole = userRoles.includes('super_admin') || requiredRoles.some(role => userRoles.includes(role));
 
     // Debug logging

@@ -4,9 +4,18 @@ class QuizModel {
     // Create quiz with enhanced fields
     static async create(data) {
         const {
-            teacher_id, subject_id, module_id, title, description,
-            quiz_type, duration_minutes, total_marks, start_date, end_date,
-            instructions, class_name, randomize_questions, max_attempts, allow_review
+            teacher_id, subject_id, module_id, title,
+            description = '',
+            quiz_type = 'standard',
+            duration_minutes = 30,
+            total_marks = 100,
+            start_date = new Date(),
+            end_date = null,
+            instructions = '',
+            class_name = '',
+            randomize_questions = false,
+            max_attempts = 1,
+            allow_review = true
         } = data;
 
         const result = await pool.query(`
@@ -248,7 +257,8 @@ class QuizModel {
                 SET status = 'submitted',
                     end_time = CURRENT_TIMESTAMP,
                     time_taken_seconds = $1,
-                    auto_graded_score = $2
+                    auto_graded_score = $2,
+                    is_released = true 
                 WHERE id = $3
                 RETURNING *
             `, [timeTaken, autoGradedScore, attemptId]);

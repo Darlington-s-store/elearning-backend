@@ -18,4 +18,49 @@ router.post('/', authMiddleware, requireRole(['admin', 'teacher']), SubjectContr
 router.put('/:id', authMiddleware, requireRole(['admin', 'teacher']), SubjectController.update);
 router.delete('/:id', authMiddleware, requireRole(['admin']), SubjectController.delete);
 
+// Student Enrollment
+router.post('/:id/enroll', authMiddleware, requireRole(['student']), async (req, res) => {
+    try {
+        const studentId = req.user.id;
+        const subjectId = req.params.id;
+
+        // Check if already enrolled
+        const check = await require('../db/pool').query(
+            'SELECT * FROM student_subjects WHERE student_id = $1 AND subject_id = $2',
+            [studentId, subjectId]
+        );
+
+        if (check.rows.length > 0) {
+            return res.json({ message: 'Already enrolled' });
+        }
+
+        await require('../db/pool').query(
+            'INSERT INTO student_subjects (student_id, subject_id) VALUES ($1, $2)',
+            [studentId, subjectId]
+        );
+
+        res.json({ message: 'Enrolled successfully' });
+    } catch (error) {
+        console.error('Enroll error:', error);
+        res.status(500).json({ error: 'Failed to enroll' });
+    }
+});
+
+router.get('/student/enrolled', authMiddleware, requireRole(['student']), async (req, res) => {
+    try {
+        const studentId = req.user.id;
+        const result = await require('../db/pool').query(`
+            SELECT s.*, 
+            (SELECT COUNT(*) FROM lessons l JOIN modules m ON l.module_id = m.id WHERE m.subject_id = s.id) as lesson_count
+            FROM subjects s
+            JOIN student_subjects ss ON s.id = ss.subject_id
+            WHERE ss.student_id = $1
+        `, [studentId]);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Get enrolled error:', error);
+        res.status(500).json({ error: 'Failed to fetch enrolled subjects' });
+    }
+});
+
 module.exports = router;

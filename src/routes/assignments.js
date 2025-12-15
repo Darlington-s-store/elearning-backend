@@ -22,5 +22,6 @@ router.post('/:id/submit', authMiddleware, requireRole(['student']), AssignmentC
 router.get('/:id/my-submission', authMiddleware, requireRole(['student']), AssignmentController.getMySubmission);
 router.get('/:id/submissions', authMiddleware, requireRole(['teacher', 'admin']), AssignmentController.getSubmissions);
 router.post('/submissions/:submissionId/grade', authMiddleware, requireRole(['teacher', 'admin']), AssignmentController.gradeSubmission);
+router.get('/submissions/:submissionId/answers', authMiddleware, requireRole(['teacher', 'admin']), AssignmentController.getAnswers);
 
 module.exports = router;

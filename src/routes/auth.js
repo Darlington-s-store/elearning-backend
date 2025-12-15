@@ -34,4 +34,12 @@ router.post('/onboarding/complete', authMiddleware, AuthController.completeOnboa
 // OTP Generation
 router.post('/generate-otp', authMiddleware, AuthController.generateOTP);
 
+// Forgot Password
+router.post('/forgot-password', AuthController.forgotPassword);
+
+// Reset Password
+router.post('/reset-password', [
+  body('newPassword').isLength({ min: 6 }).withMessage('Password must be at least 6 characters')
+], AuthController.resetPassword);
+
 module.exports = router;

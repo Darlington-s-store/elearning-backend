@@ -102,6 +102,8 @@ class AssignmentModel {
 
             // 2. Process Answers & Auto-Grade
             let totalScore = 0;
+
+            // If answers provided in payload, process them (legacy/bulk mode)
             if (answers && answers.length > 0) {
                 // Fetch questions to check correct answers
                 const questionsResult = await client.query(
@@ -136,9 +138,39 @@ class AssignmentModel {
                         [submission.id, ans.question_id, ans.answer, isCorrect, marks]
                     );
                 }
+            } else {
+                // If answers NOT provided, calculate score from ALREADY SAVED answers
+                const storedAnswers = await client.query(
+                    'SELECT marks_awarded FROM student_assignment_answers WHERE assignment_submission_id = $1',
+                    [submission.id]
+                );
+                totalScore = storedAnswers.rows.reduce((acc, row) => acc + (parseFloat(row.marks_awarded) || 0), 0);
+            }
 
-                // Update submission score if strictly auto-graded (or partial)
-                // Note: If mixed with manual grading, this might be a temporary score.
+            // Update submission score if strictly auto-graded (or partial)
+            // Only update score if status is becoming 'submitted' (or if we want real-time score updates, but usually on submit)
+            if (status === 'submitted') {
+                await client.query('UPDATE student_assignments SET score = $1, status = $2 WHERE id = $3', [totalScore, 'graded', submission.id]); // Auto-grade moves to 'graded' immediately for objective, or 'submitted' if mixed? 
+                // User requirement: "automatically grade them". So let's set to 'graded' if it's purely auto-gradable types?
+                // For safety, if it's mixed, maybe keep as 'submitted'? 
+                // But user wants "grade them". 
+                // Let's assume for now we mark as 'graded' so student sees green/red immediately.
+                // WE SHOULD CHECK if there are any subjective questions (short_answer) that need teacher review.
+
+                const questionsCheck = await client.query(
+                    `SELECT COUNT(*) as subjective_count FROM assignment_questions 
+                     WHERE assignment_id = $1 AND question_type NOT IN ('mcq', 'true_false')`,
+                    [assignment_id]
+                );
+
+                const hasSubjective = parseInt(questionsCheck.rows[0].subjective_count) > 0;
+                const finalStatus = hasSubjective ? 'submitted' : 'graded';
+
+                await client.query('UPDATE student_assignments SET score = $1, status = $2 WHERE id = $3', [totalScore, finalStatus, submission.id]);
+                submission.score = totalScore;
+                submission.status = finalStatus;
+            } else {
+                // Update score for draft too? Maybe not.
                 await client.query('UPDATE student_assignments SET score = $1 WHERE id = $2', [totalScore, submission.id]);
                 submission.score = totalScore;
             }

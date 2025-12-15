@@ -249,6 +249,15 @@ class AssignmentController {
             res.status(500).json({ error: 'Failed to save answer' });
         }
     }
+    static async getAnswers(req, res) {
+        try {
+            const answers = await AssignmentService.getAnswers(req.params.submissionId);
+            res.json(answers);
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Failed to fetch answers' });
+        }
+    }
 }
 
 module.exports = AssignmentController;
