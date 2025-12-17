@@ -78,7 +78,8 @@ router.get('/', authMiddleware, requireRole(['admin', 'teacher']), async (req, r
         status: user.subscription_status || 'inactive',
         plan: user.plan_name || 'None',
         endDate: user.subscription_end_date
-      }
+      },
+      createdAt: user.created_at,
     }));
 
     res.json(users);
@@ -160,6 +161,53 @@ router.put('/:id', authMiddleware, async (req, res) => {
   } catch (error) {
     console.error('Update user error:', error);
     res.status(500).json({ error: 'Failed to update user' });
+  }
+});
+
+// Update user subscription (admin only)
+router.put('/:id/subscription', authMiddleware, requireRole('admin'), async (req, res) => {
+  try {
+    const { plan, status, expiresAt } = req.body;
+    const userId = req.params.id;
+
+    // 1. Check if user exists
+    const userCheck = await pool.query('SELECT id FROM users WHERE id = $1', [userId]);
+    if (userCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // 2. Check for existing subscription or create new one
+    // We'll update the latest subscription or insert if none exists
+    const subCheck = await pool.query('SELECT id FROM subscriptions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1', [userId]);
+
+    let result;
+    if (subCheck.rows.length > 0) {
+      // Update existing
+      const subId = subCheck.rows[0].id;
+      result = await pool.query(`
+         UPDATE subscriptions 
+         SET plan = COALESCE($1, plan),
+             status = COALESCE($2, status),
+             expires_at = COALESCE($3, expires_at),
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = $4
+         RETURNING *
+       `, [plan, status, expiresAt, subId]);
+    } else {
+      // Create new (if admin wants to manually add one)
+      // Default amounts based on plan if creating new
+      const amount = plan === 'family' ? 1300 : 300;
+      result = await pool.query(`
+         INSERT INTO subscriptions (user_id, plan, status, expires_at, amount, starts_at)
+         VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
+         RETURNING *
+       `, [userId, plan, status, expiresAt, amount]);
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Update subscription error:', error);
+    res.status(500).json({ error: 'Failed to update subscription' });
   }
 });
 

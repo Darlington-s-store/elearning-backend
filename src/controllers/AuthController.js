@@ -14,6 +14,30 @@ class AuthController {
             // Better to pass explicit fields.
             const result = await AuthService.register({ name, email, password, role, phone, school, age, studentClass, ...rest });
 
+            // Notify Admins
+            try {
+                const pool = require('../db/pool');
+                const NotificationModel = require('../models/NotificationModel');
+
+                const adminResult = await pool.query("SELECT id FROM users WHERE role = 'admin'");
+                const admins = adminResult.rows;
+
+                const notificationPromises = admins.map(admin =>
+                    NotificationModel.create({
+                        user_id: admin.id,
+                        type: 'info',
+                        title: 'New User Registration',
+                        message: `${role.charAt(0).toUpperCase() + role.slice(1)} ${name} has joined the platform.`,
+                        data: { userId: result.user.id, role }
+                    })
+                );
+
+                await Promise.all(notificationPromises);
+            } catch (notifError) {
+                console.error('Failed to notify admins:', notifError);
+                // Don't fail the registration if notification fails
+            }
+
             res.status(201).json(result);
         } catch (error) {
             if (error.message === 'Email already registered') {
