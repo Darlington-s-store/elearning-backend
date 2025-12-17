@@ -17,21 +17,28 @@ router.get('/', authMiddleware, requireRole(['admin', 'teacher']), async (req, r
       SELECT u.id, u.name, u.email, u.role, u.phone, u.avatar, u.is_approved, u.is_onboarded, u.created_at,
              u.student_class, u.school,
              MAX(COALESCE(ux.total_xp, 0)) as total_xp, MAX(COALESCE(ux.level, 1)) as level,
-             u.subscription_status, u.subscription_end_date,
              (SELECT COUNT(*) FROM parent_children pc WHERE pc.parent_id = u.id)::int as children_count,
+             (
+                SELECT s.status
+                FROM subscriptions s 
+                WHERE s.user_id = u.id
+                ORDER BY s.created_at DESC 
+                LIMIT 1
+             ) as subscription_status,
+             (
+                SELECT s.expires_at
+                FROM subscriptions s 
+                WHERE s.user_id = u.id
+                ORDER BY s.created_at DESC 
+                LIMIT 1
+             ) as subscription_end_date,
              (
                 SELECT s.plan
                 FROM subscriptions s 
-                WHERE s.user_id = u.id AND s.status = 'active' 
+                WHERE s.user_id = u.id
                 ORDER BY s.created_at DESC 
                 LIMIT 1
              ) as plan_name,
-             (SELECT AVG(percentage) FROM quiz_attempts qa WHERE qa.user_id = u.id) as avg_quiz_score,
-             (SELECT COUNT(*) FROM quiz_attempts qa WHERE qa.user_id = u.id AND qa.passed = true) as completed_quizzes,
-             (SELECT COUNT(*) FROM user_progress up WHERE up.user_id = u.id AND up.is_completed = true) as completed_lessons,
-             (SELECT AVG(percentage) FROM quiz_attempts qa WHERE qa.user_id = u.id) as avg_quiz_score,
-             (SELECT COUNT(*) FROM quiz_attempts qa WHERE qa.user_id = u.id AND qa.passed = true) as completed_quizzes,
-             (SELECT COUNT(*) FROM user_progress up WHERE up.user_id = u.id AND up.is_completed = true) as completed_lessons,
              (
                 SELECT u2.name 
                 FROM parent_children pc2 
@@ -103,6 +110,11 @@ router.post('/generate-otp', authMiddleware, async (req, res) => {
 // Get user by ID
 router.get('/:id', authMiddleware, async (req, res) => {
   try {
+    // Users can only view their own profile or if they are admin
+    if (String(req.user.id) !== String(req.params.id) && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
     const result = await pool.query(`
       SELECT id, name, email, role, phone, avatar, is_approved, is_onboarded, created_at
       FROM users WHERE id = $1
@@ -123,7 +135,8 @@ router.get('/:id', authMiddleware, async (req, res) => {
 router.put('/:id', authMiddleware, async (req, res) => {
   try {
     // Users can only update their own profile, unless admin
-    if (req.user.id !== req.params.id && req.user.role !== 'admin') {
+    // Normalize comparison: req.params.id is a string
+    if (String(req.user.id) !== String(req.params.id) && req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Unauthorized' });
     }
 
@@ -240,7 +253,41 @@ router.post('/:id/children', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'Only parents can add children' });
     }
 
+    // Parents can only add children to their own account; admins can manage any parent
+    if (req.user.role === 'parent' && String(req.user.id) !== String(req.params.id)) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
     const { name, grade, school, age, studentClass, phone } = req.body;
+
+    // --- ENFORCE PLAN LIMITS ---
+    // 1. Get current plan
+    const subResult = await pool.query(`
+      SELECT plan FROM subscriptions 
+      WHERE user_id = $1 AND (status = 'active' OR status = 'trial') 
+      ORDER BY created_at DESC LIMIT 1
+    `, [req.user.id]);
+
+    // Default to 'single' if no active subscription found (or block entirely? Assuming free tier = single for now)
+    const plan = subResult.rows[0]?.plan?.toLowerCase() || 'single';
+
+    // 2. Count existing children
+    const countResult = await pool.query(`
+      SELECT COUNT(*) FROM parent_children WHERE parent_id = $1
+    `, [req.user.id]);
+    const currentCount = parseInt(countResult.rows[0].count);
+
+    // 3. Define limits
+    // 'family' -> 4 children
+    // 'single' (or anything else) -> 1 child
+    const limit = (plan.includes('family') || plan === 'family') ? 4 : 1;
+
+    if (currentCount >= limit) {
+      return res.status(403).json({
+        error: `Plan limit reached. Your '${plan}' plan allows max ${limit} child${limit > 1 ? 'ren' : ''}. Upgrade to 'Family' to add more.`
+      });
+    }
+    // ---------------------------
 
     let childId;
 
@@ -322,6 +369,11 @@ router.post('/:id/children', authMiddleware, async (req, res) => {
 // Get parent's children
 router.get('/:id/children', authMiddleware, async (req, res) => {
   try {
+    // Parents can only view their own children; admins can view any parent's children
+    if (String(req.user.id) !== String(req.params.id) && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
     const result = await pool.query(`
       SELECT u.id, u.name, u.email, u.avatar, u.created_at,
              COALESCE(ux.total_xp, 0) as xp, COALESCE(ux.level, 1) as level

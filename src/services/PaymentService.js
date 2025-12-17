@@ -63,19 +63,42 @@ class PaymentService {
             const email = user.email;
             const callbackUrl = `${process.env.FRONTEND_URL || 'http://localhost:8080'}/payment/verify`; // Frontend verification route
 
+            // Fetch Plan details to check for recurring plan code
+            // We need to fetch the plan using PlanModel or direct query. 
+            // Since we are in Service, it's better to use Model. 
+            // BUT PlanModel.findById queries 'plans' table.
+
+            // Note: PlanModel wasn't imported. I need to add it or query directly.
+            // Let's assume I can query using pool or need to import PlanModel.
+            // For safety and existing pattern, I'll use pool since PlanModel might not be imported in this file yet.
+
+            // Check imports at top of file: PaymentModel, SubscriptionModel, pool. 
+            // PlanModel is NOT imported. I will add import at top in next step? 
+            // For now, I'll use direct pool query to be safe and atomic in this edit.
+
+            const planResult = await pool.query('SELECT paystack_plan_code FROM plans WHERE id = $1', [planId]);
+            const planCode = planResult.rows[0]?.paystack_plan_code;
+
+            const payload = {
+                email,
+                amount: Math.round(Number(amount) * 100), // Ensure integer Kobo/Pesewas
+                currency: 'GHS', // Ghanaian Cedis
+                callback_url: callbackUrl,
+                metadata: {
+                    plan_id: planId,
+                    user_id: user.id
+                }
+            };
+
+            // If it's a recurring plan, add the plan code
+            if (planCode) {
+                payload.plan = planCode;
+            }
+
             // 1. Initialize with Paystack
             const response = await axios.post(
                 'https://api.paystack.co/transaction/initialize',
-                {
-                    email,
-                    amount: Math.round(Number(amount) * 100), // Ensure integer Kobo/Pesewas
-                    currency: 'GHS', // Ghanaian Cedis
-                    callback_url: callbackUrl,
-                    metadata: {
-                        plan_id: planId,
-                        user_id: user.id
-                    }
-                },
+                payload,
                 {
                     headers: {
                         Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,

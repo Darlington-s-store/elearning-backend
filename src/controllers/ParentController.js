@@ -7,8 +7,10 @@ class ParentController {
             // We need to verify if this user is a parent and get their profile? 
             // For now, simpler: we assume the logged in user IS the parent.
 
-            const { name, age, grade } = req.body;
-            const result = await ParentService.addChild(req.user.id, { name, age, grade });
+            const { name, age, grade, subjects } = req.body;
+            console.log('Adding child:', { name, age, grade, subjectsCount: subjects?.length });
+
+            const result = await ParentService.addChild(req.user.id, { name, age, grade, subjects });
 
             res.status(201).json({
                 message: 'Child added successfully',
@@ -16,8 +18,11 @@ class ParentController {
                 studentCredentials: result.studentUser
             });
         } catch (error) {
-            console.error(error);
-            res.status(500).json({ error: 'Failed to add child' });
+            console.error('Add Child Error:', error);
+            res.status(500).json({
+                error: 'Failed to add child',
+                details: process.env.NODE_ENV === 'development' ? error.message : undefined
+            });
         }
     }
 

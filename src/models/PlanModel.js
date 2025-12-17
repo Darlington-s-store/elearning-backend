@@ -14,6 +14,7 @@ class PlanModel {
                 END as duration,
                 features, 
                 description,
+                paystack_plan_code,
                 (price = 1300) as recommended 
             FROM plans 
             ORDER BY price ASC
@@ -26,12 +27,12 @@ class PlanModel {
         return result.rows[0];
     }
 
-    static async create({ id, name, price, duration, features, recommended, description }) {
+    static async create({ id, name, price, duration, features, recommended, description, paystack_plan_code }) {
         const result = await pool.query(
-            `INSERT INTO plans (id, name, price, duration, features, recommended, description)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)
+            `INSERT INTO plans (id, name, price, duration, features, recommended, description, paystack_plan_code)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
              RETURNING *`,
-            [id, name, price, duration, features, recommended, description]
+            [id, name, price, duration, features, recommended, description, paystack_plan_code]
         );
         return result.rows[0];
     }

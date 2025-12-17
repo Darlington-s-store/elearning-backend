@@ -2,6 +2,9 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 
+const jwt = require('jsonwebtoken');
+const pool = require('./db/pool');
+
 const http = require('http');
 const { Server } = require('socket.io');
 
@@ -17,15 +20,45 @@ const io = new Server(server, {
   }
 });
 
+// Socket authentication: verify JWT on connect and attach user to socket
+io.use(async (socket, next) => {
+  try {
+    // Token can be passed in handshake auth or query: { token: 'Bearer <token>' } or '?token=<token>'
+    const auth = socket.handshake.auth || {};
+    const tokenRaw = auth.token || socket.handshake.query?.token;
+    if (!tokenRaw) {
+      return next(); // allow unauthenticated sockets to connect but they won't be able to join-class
+    }
+
+    const token = typeof tokenRaw === 'string' && tokenRaw.startsWith('Bearer ') ? tokenRaw.split(' ')[1] : tokenRaw;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // Fetch user from DB to populate roles/flags
+    const result = await pool.query('SELECT id, name, email, role, is_approved, is_onboarded FROM users WHERE id = $1', [decoded.userId]);
+    if (result.rows.length === 0) return next(new Error('Unauthorized'));
+
+    socket.user = result.rows[0];
+    next();
+  } catch (err) {
+    console.warn('Socket auth failed:', err.message || err);
+    // Don't allow an unauthenticated socket to proceed with privileged actions
+    return next();
+  }
+});
+
 // Store waiting students: { classId: [ { socketId, user: { id, name, role } } ] }
 const waitingRooms = {};
 
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
-  socket.on('join-class', ({ classId, user }) => {
-    // Store user info on socket for security checks
-    socket.user = user;
+  socket.on('join-class', ({ classId }) => {
+    // Use authenticated socket.user (set via io.use) — do not trust client-supplied user object
+    const user = socket.user;
+
+    if (!user) {
+      socket.emit('unauthorized', { message: 'Authentication required to join class' });
+      return;
+    }
 
     // If teacher, they join immediately and become host
     if (user.role === 'teacher' || user.role === 'admin') {
@@ -47,7 +80,7 @@ io.on('connection', (socket) => {
         waitingRooms[classId].push({ socketId: socket.id, user });
       }
 
-      // Notify host (all teachers in the room, effectively)
+      // Notify host (all teachers in the room)
       socket.to(classId).emit('student-waiting', { socketId: socket.id, user });
       socket.emit('waiting');
     }
@@ -153,6 +186,7 @@ app.use('/api/plans', require('./routes/plans'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/live-classes', require('./routes/live_classes'));
 app.use('/api/teachers', require('./routes/teachers'));
+app.use('/api/rewards', require('./routes/rewards'));
 
 // Error handling middleware
 app.use((err, req, res, next) => {

@@ -9,6 +9,10 @@ class MessagingService {
         return await MessagingModel.getInbox(userId);
     }
 
+    static async getSent(userId) {
+        return await MessagingModel.getSent(userId);
+    }
+
     static async markAsRead(messageId) {
         return await MessagingModel.markAsRead(messageId);
     }

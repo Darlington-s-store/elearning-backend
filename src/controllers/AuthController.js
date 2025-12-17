@@ -61,7 +61,26 @@ class AuthController {
     static async getMe(req, res) {
         try {
             // Return user in the same format as login
-            const user = req.user;
+            let user = req.user;
+
+            // If the user is a parent, fetch their children to include in the response
+            if (user && user.role === 'parent') {
+                try {
+                    const pool = require('../db/pool');
+                    const childrenResult = await pool.query(`
+                        SELECT u.id, u.name, u.email, u.avatar, u.student_class as grade, u.age
+                        FROM users u
+                        INNER JOIN parent_children pc ON u.id = pc.child_id
+                        WHERE pc.parent_id = $1
+                    `, [user.id]);
+
+                    user = { ...user, children: childrenResult.rows };
+                } catch (childErr) {
+                    console.error('Failed to fetch parent children for getMe:', childErr);
+                    // proceed without children
+                }
+            }
+
             res.json({ user });
         } catch (error) {
             console.error('Get me error:', error);
@@ -87,9 +106,12 @@ class AuthController {
 
             const code = await OtpService.generateOTP(req.user.id, req.body.type || 'general');
 
-            // In a real app, we wouldn't return the code, but for this mock implementation we do
-            // so the frontend can display it for testing.
-            res.json({ message: 'OTP generated', code });
+            // In production we should never return the code. Expose it only in development.
+            if (process.env.NODE_ENV === 'development') {
+                return res.json({ message: 'OTP generated', code });
+            }
+
+            res.json({ message: 'OTP generated' });
         } catch (error) {
             console.error('Generate OTP error:', error);
             res.status(500).json({ error: 'Failed to generate OTP' });

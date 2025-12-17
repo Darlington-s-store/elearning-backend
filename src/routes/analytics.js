@@ -73,6 +73,12 @@ router.get('/admin', authMiddleware, requireRole('admin'), async (req, res) => {
 
     // System alerts
     const alerts = [];
+
+    // Check for pending teachers
+    const pendingTeachersResult = await pool.query(`
+      SELECT COUNT(*) as count FROM users WHERE role = 'teacher' AND is_approved = false
+    `);
+
     const pendingCount = parseInt(pendingTeachersResult.rows[0].count);
     if (pendingCount > 0) {
       alerts.push({

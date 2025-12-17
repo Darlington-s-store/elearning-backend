@@ -36,13 +36,22 @@ class QuizController {
   static async update(req, res) {
     try {
       const { id } = req.params;
-      const quiz = await QuizService.updateQuiz(id, req.body);
+      
+      // Check ownership: teachers can only update their own quizzes
+      if (req.user.role === 'teacher') {
+        const quiz = await QuizService.getQuizById(id);
+        if (String(quiz.teacher_id) !== String(req.user.id)) {
+          return res.status(403).json({ error: 'Unauthorized: not your quiz' });
+        }
+      }
 
-      if (!quiz) {
+      const updatedQuiz = await QuizService.updateQuiz(id, req.body);
+
+      if (!updatedQuiz) {
         return res.status(404).json({ error: 'Quiz not found' });
       }
 
-      res.json(quiz);
+      res.json(updatedQuiz);
     } catch (error) {
       console.error('Update quiz error:', error);
       res.status(500).json({ error: 'Failed to update quiz' });

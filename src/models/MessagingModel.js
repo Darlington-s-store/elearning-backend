@@ -28,6 +28,20 @@ class MessagingModel {
         return result.rows;
     }
 
+    static async getSent(userId) {
+        const result = await pool.query(`
+            SELECT m.*, 
+                   u.name as recipient_name, 
+                   u.email as recipient_email
+            FROM messages m
+            LEFT JOIN users u ON m.recipient_id = u.id
+            WHERE m.sender_id = $1
+            ORDER BY m.created_at DESC
+        `, [userId]);
+
+        return result.rows;
+    }
+
     static async markAsRead(messageId) {
         const result = await pool.query(`
             UPDATE messages SET is_read = true WHERE id = $1 RETURNING *

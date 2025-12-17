@@ -182,7 +182,11 @@ class AuthService {
         // For dev, we return it in the message or log it.
         console.log(`[PASSWORD RESET] OTP for ${email}: ${code}`);
 
-        return { message: 'OTP sent to your email.', devCode: code };
+        if (process.env.NODE_ENV === 'development') {
+            return { message: 'OTP sent to your email.', devCode: code };
+        }
+
+        return { message: 'OTP sent to your email.' };
     }
 
     static async resetPassword(email, otp, newPassword) {

@@ -48,6 +48,15 @@ class AssignmentController {
     static async update(req, res) {
         try {
             const { id } = req.params;
+            
+            // Check ownership: teachers can only update their own assignments
+            if (req.user.role === 'teacher') {
+                const assignment = await AssignmentService.getAssignment(id);
+                if (String(assignment.teacher_id) !== String(req.user.id)) {
+                    return res.status(403).json({ error: 'Unauthorized: not your assignment' });
+                }
+            }
+
             const { title, description, due_date, max_score, resources, submission_type, status } = req.body;
 
             const updated = await AssignmentService.updateAssignment(id, {
@@ -64,6 +73,14 @@ class AssignmentController {
 
     static async delete(req, res) {
         try {
+            // Check ownership: teachers can only delete their own assignments
+            if (req.user.role === 'teacher') {
+                const assignment = await AssignmentService.getAssignment(req.params.id);
+                if (String(assignment.teacher_id) !== String(req.user.id)) {
+                    return res.status(403).json({ error: 'Unauthorized: not your assignment' });
+                }
+            }
+
             await AssignmentService.deleteAssignment(req.params.id);
             res.json({ message: 'Assignment deleted' });
         } catch (error) {
@@ -184,6 +201,14 @@ class AssignmentController {
     // Question Management
     static async addQuestion(req, res) {
         try {
+            // Check ownership: teachers can only add questions to their own assignments
+            if (req.user.role === 'teacher') {
+                const assignment = await AssignmentService.getAssignment(req.params.id);
+                if (String(assignment.teacher_id) !== String(req.user.id)) {
+                    return res.status(403).json({ error: 'Unauthorized: not your assignment' });
+                }
+            }
+
             const question = await AssignmentService.addQuestion({
                 ...req.body,
                 assignment_id: req.params.id

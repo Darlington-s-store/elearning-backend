@@ -34,6 +34,16 @@ class MessagingController {
         }
     }
 
+    static async getSent(req, res) {
+        try {
+            const messages = await MessagingService.getSent(req.user.id);
+            res.json(messages);
+        } catch (error) {
+            console.error('Get sent messages error:', error);
+            res.status(500).json({ error: 'Failed to fetch sent messages' });
+        }
+    }
+
     static async markAsRead(req, res) {
         try {
             const { id } = req.params;

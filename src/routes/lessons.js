@@ -149,6 +149,22 @@ router.post('/', authMiddleware, upload.single('file'), async (req, res) => {
 // Update Lesson
 router.put('/:id', authMiddleware, async (req, res) => {
     try {
+        // Only teachers and admins can update lessons; teachers can only update their own
+        if (!['teacher', 'admin'].includes(req.user.role)) {
+            return res.status(403).json({ error: 'Only teachers can update lessons' });
+        }
+
+        // Check ownership: teachers can only update their own lessons
+        if (req.user.role === 'teacher') {
+            const ownerCheck = await pool.query(
+                'SELECT created_by FROM lessons WHERE id = $1',
+                [req.params.id]
+            );
+            if (ownerCheck.rows.length === 0 || String(ownerCheck.rows[0].created_by) !== String(req.user.id)) {
+                return res.status(403).json({ error: 'Unauthorized: not your lesson' });
+            }
+        }
+
         const { title, content, video_url, duration_minutes, is_active } = req.body;
         const result = await pool.query(`
       UPDATE lessons 
@@ -172,6 +188,22 @@ router.put('/:id', authMiddleware, async (req, res) => {
 // Delete Lesson
 router.delete('/:id', authMiddleware, async (req, res) => {
     try {
+        // Only teachers and admins can delete lessons; teachers can only delete their own
+        if (!['teacher', 'admin'].includes(req.user.role)) {
+            return res.status(403).json({ error: 'Only teachers can delete lessons' });
+        }
+
+        // Check ownership: teachers can only delete their own lessons
+        if (req.user.role === 'teacher') {
+            const ownerCheck = await pool.query(
+                'SELECT created_by FROM lessons WHERE id = $1',
+                [req.params.id]
+            );
+            if (ownerCheck.rows.length === 0 || String(ownerCheck.rows[0].created_by) !== String(req.user.id)) {
+                return res.status(403).json({ error: 'Unauthorized: not your lesson' });
+            }
+        }
+
         const result = await pool.query('DELETE FROM lessons WHERE id = $1 RETURNING *', [req.params.id]);
         if (result.rows.length === 0) return res.status(404).json({ error: 'Lesson not found' });
         res.json({ message: 'Lesson deleted' });

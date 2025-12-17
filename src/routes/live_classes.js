@@ -76,6 +76,17 @@ router.post('/', authMiddleware, requireRole(['teacher', 'admin']), async (req, 
 // Update status (e.g., start/end)
 router.put('/:id/status', authMiddleware, requireRole(['teacher', 'admin']), async (req, res) => {
     try {
+        // Check ownership: teachers can only update their own classes
+        if (req.user.role === 'teacher') {
+            const ownerCheck = await pool.query(
+                'SELECT teacher_id FROM live_classes WHERE id = $1',
+                [req.params.id]
+            );
+            if (ownerCheck.rows.length === 0 || String(ownerCheck.rows[0].teacher_id) !== String(req.user.id)) {
+                return res.status(403).json({ error: 'Unauthorized: not your class' });
+            }
+        }
+
         const { status } = req.body; // 'live', 'completed', 'scheduled'
         const result = await pool.query(`
       UPDATE live_classes
@@ -97,6 +108,17 @@ router.put('/:id/status', authMiddleware, requireRole(['teacher', 'admin']), asy
 // Delete class
 router.delete('/:id', authMiddleware, requireRole(['teacher', 'admin']), async (req, res) => {
     try {
+        // Check ownership: teachers can only delete their own classes
+        if (req.user.role === 'teacher') {
+            const ownerCheck = await pool.query(
+                'SELECT teacher_id FROM live_classes WHERE id = $1',
+                [req.params.id]
+            );
+            if (ownerCheck.rows.length === 0 || String(ownerCheck.rows[0].teacher_id) !== String(req.user.id)) {
+                return res.status(403).json({ error: 'Unauthorized: not your class' });
+            }
+        }
+
         const result = await pool.query('DELETE FROM live_classes WHERE id = $1 RETURNING id', [req.params.id]);
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Class not found' });
