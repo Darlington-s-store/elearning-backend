@@ -22,14 +22,14 @@ router.get('/my-students', authMiddleware, requireRole(['teacher', 'admin']), as
                 u.student_class,
                 u.is_approved,
                 u.created_at,
-                (SELECT AVG(percentage) FROM quiz_attempts qa WHERE qa.user_id = u.id) as avg_score,
-                (SELECT COUNT(*) FROM user_progress up WHERE up.user_id = u.id AND up.is_completed = true) as completed_lessons,
+                (SELECT AVG(percentage) FROM quiz_attempts qa WHERE qa.user_id::text = u.id::text) as avg_score,
+                (SELECT COUNT(*) FROM user_progress up WHERE up.user_id::text = u.id::text AND up.is_completed = true) as completed_lessons,
                 STRING_AGG(DISTINCT s.name, ', ') as enrolled_subjects
             FROM users u
             JOIN student_subjects ss ON u.id = ss.student_id
             JOIN subjects s ON ss.subject_id = s.id
             JOIN teacher_subjects ts ON s.id = ts.subject_id
-            WHERE ts.teacher_id = $1 AND u.role = 'student'
+            WHERE ts.teacher_id::text = $1::text AND u.role = 'student'
             GROUP BY u.id
             ORDER BY u.name ASC;
         `;

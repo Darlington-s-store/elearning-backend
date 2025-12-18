@@ -11,7 +11,7 @@ router.get('/', authMiddleware, async (req, res) => {
       SELECT lc.*, s.name as subject_name, u.name as teacher_name
       FROM live_classes lc
       LEFT JOIN subjects s ON lc.subject_id = s.id
-      LEFT JOIN users u ON lc.teacher_id = u.id
+    LEFT JOIN users u ON lc.teacher_id::text = u.id
       WHERE 1=1
     `;
         const params = [];

@@ -18,7 +18,7 @@ class GradesModel {
             SELECT g.*, s.name as subject_name, u.name as teacher_name
             FROM grades g
             JOIN subjects s ON g.subject_id = s.id
-            LEFT JOIN users u ON g.teacher_id = u.id
+            LEFT JOIN users u ON g.teacher_id::text = u.id
             WHERE g.student_id = $1
         `;
         const params = [studentId];

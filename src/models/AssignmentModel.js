@@ -190,7 +190,7 @@ class AssignmentModel {
         const result = await pool.query(`
             SELECT sa.*, u.name as student_name, u.email as student_email, u.avatar as student_avatar
             FROM student_assignments sa
-            JOIN users u ON sa.student_id = u.id
+            JOIN users u ON sa.student_id::text = u.id
             WHERE sa.assignment_id = $1
             ORDER BY sa.submitted_at DESC
         `, [assignmentId]);

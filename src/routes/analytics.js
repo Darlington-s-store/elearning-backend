@@ -408,7 +408,7 @@ router.get('/parent', authMiddleware, async (req, res) => {
       JOIN quizzes q ON qa.quiz_id = q.id
       JOIN modules m ON q.module_id = m.id
       JOIN subjects s ON m.subject_id = s.id
-      JOIN users u ON qa.user_id = u.id
+      JOIN users u ON qa.user_id::text = u.id
       WHERE qa.user_id = ANY($1)
       GROUP BY s.name, u.name
     `, [childIds]);
@@ -426,13 +426,13 @@ router.get('/parent', authMiddleware, async (req, res) => {
       SELECT 'lesson' as type, l.title as name, up.completed_at as date, u.name as student_name
       FROM user_progress up
       INNER JOIN lessons l ON up.lesson_id = l.id
-      INNER JOIN users u ON up.user_id = u.id
+      INNER JOIN users u ON up.user_id::text = u.id
       WHERE up.user_id = ANY($1) AND up.is_completed = true
       UNION ALL
       SELECT 'quiz' as type, q.title as name, qa.completed_at as date, u.name as student_name
       FROM quiz_attempts qa
       INNER JOIN quizzes q ON qa.quiz_id = q.id
-      INNER JOIN users u ON qa.user_id = u.id
+      INNER JOIN users u ON qa.user_id::text = u.id
       WHERE qa.user_id = ANY($1)
       ORDER BY date DESC LIMIT 5
     `, [childIds]);

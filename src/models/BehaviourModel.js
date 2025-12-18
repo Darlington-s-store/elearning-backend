@@ -17,7 +17,7 @@ class BehaviourModel {
         let query = `
             SELECT b.*, u.name as teacher_name
             FROM behaviour_records b
-            JOIN users u ON b.teacher_id = u.id
+            JOIN users u ON b.teacher_id::text = u.id
             WHERE b.student_id = $1
         `;
         const params = [studentId];

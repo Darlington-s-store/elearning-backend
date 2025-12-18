@@ -24,7 +24,7 @@ class AttendanceModel {
             SELECT a.*, s.name as subject_name, u.name as teacher_name
             FROM attendance a
             JOIN subjects s ON a.subject_id = s.id
-            JOIN users u ON a.teacher_id = u.id
+            JOIN users u ON a.teacher_id::text = u.id
             WHERE a.student_id = $1
         `;
         const params = [studentId];
@@ -55,7 +55,7 @@ class AttendanceModel {
         const result = await pool.query(`
             SELECT a.*, u.name as student_name, u.email as student_email
             FROM attendance a
-            JOIN users u ON a.student_id = u.id
+            JOIN users u ON a.student_id::text = u.id
             WHERE a.subject_id = $1 AND a.date = $2
             ORDER BY u.name
         `, [subjectId, date]);

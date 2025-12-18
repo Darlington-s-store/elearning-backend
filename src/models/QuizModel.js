@@ -177,7 +177,7 @@ class QuizModel {
         const result = await pool.query(`
             SELECT qa.*, u.name as student_name, u.email as student_email
             FROM quiz_attempts qa
-            JOIN users u ON qa.student_id = u.id
+            JOIN users u ON qa.student_id::text = u.id
             WHERE qa.quiz_id = $1
             ORDER BY qa.created_at DESC
         `, [quizId]);
