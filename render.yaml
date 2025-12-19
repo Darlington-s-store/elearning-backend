@@ -1,0 +1,32 @@
+{
+  "services": [
+    {
+      "type": "web",
+      "name": "elearning-backend",
+      "env": "node",
+      "region": "oregon",
+      "plan": "free",
+      "buildCommand": "npm install",
+      "startCommand": "node src/server.js",
+      "healthCheckPath": "/api/health",
+      "envVars": [
+        {
+          "key": "NODE_ENV",
+          "value": "production"
+        },
+        {
+          "key": "PORT",
+          "generateValue": true
+        }
+      ]
+    }
+  ],
+  "databases": [
+    {
+      "name": "elearning-db",
+      "plan": "free",
+      "databaseName": "elearning",
+      "user": "elearning"
+    }
+  ]
+}
